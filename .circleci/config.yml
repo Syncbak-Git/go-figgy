@@ -1,0 +1,21 @@
+version: 2.1
+jobs:
+  test:
+    working_directory: /go/src/github.com/Syncbak-Git/figgy
+    docker:
+      - image: circleci/golang:1.12.5-stretch
+    steps:
+      - checkout
+      - run:
+          name: Test package
+          command: |
+            mkdir -p ./test-results/go-unit
+            #gotestsum is already installed on the circleci docker image
+            gotestsum --junitfile ./test-results/go-unit/unit-tests.xml
+      - store_test_results:
+          path: ./test-results/go-unit
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
