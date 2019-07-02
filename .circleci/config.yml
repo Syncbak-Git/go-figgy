@@ -1,4 +1,6 @@
 version: 2.1
+orbs:
+  codecov: codecov/codecov@1.0.2
 jobs:
   test:
     working_directory: /go/src/github.com/Syncbak-Git/figgy
@@ -14,6 +16,12 @@ jobs:
             gotestsum --junitfile ./test-results/go-unit/unit-tests.xml
       - store_test_results:
           path: ./test-results
+      - run:
+          name: Generate coverage report
+          command: go test -race -coverprofile=cov.txt -covermode=atomic
+      - codecov/upload:
+          file: cov.txt
+          flags: "unittests"
 workflows:
   version: 2
   test:
