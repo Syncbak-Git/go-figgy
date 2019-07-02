@@ -75,7 +75,7 @@ func newField(key string, decrypt bool) *field {
 // Load AWS Parameter Store parameters based on the defined tags.
 //
 // When a source type is an array, it is assumed the parameter being loaded
-// is a comma seperated list.  The list will be split and converted to
+// is a comma separated list.  The list will be split and converted to
 // match the array's typing.
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
@@ -190,7 +190,7 @@ func set(v reflect.Value, s string) error {
 		v.Set(new)
 		break
 	case reflect.Slice:
-		// we assume the list is seperated by commas
+		// we assume the list is separated by commas
 		l := strings.Split(s, ",")
 		sz := len(l)
 		v.Set(reflect.MakeSlice(v.Type(), sz, sz))
