@@ -13,7 +13,7 @@ jobs:
             #gotestsum is already installed on the circleci docker image
             gotestsum --junitfile ./test-results/go-unit/unit-tests.xml
       - store_test_results:
-          path: ./test-results/go-unit
+          path: ./test-results
 workflows:
   version: 2
   test:
