@@ -2,6 +2,7 @@
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/Syncbak-Git/go-figgy)
 [![CircleCI](https://circleci.com/gh/Syncbak-Git/go-figgy/tree/master.svg?style=shield)](https://circleci.com/gh/Syncbak-Git/go-figgy/tree/master)
+[![codecov](https://codecov.io/gh/Syncbak-Git/go-figgy/branch/master/graph/badge.svg)](https://codecov.io/gh/Syncbak-Git/go-figgy)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Syncbak-Git/go-figgy)](https://goreportcard.com/report/github.com/Syncbak-Git/go-figgy)
 
 ## Why is this a thing?!
