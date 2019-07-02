@@ -24,217 +24,217 @@ func (c MockSSMClient) GetParameter(i *ssm.GetParameterInput) (*ssm.GetParameter
 func NewMockSSMClient() *MockSSMClient {
 	m := &MockSSMClient{}
 	m.Data = map[string]*ssm.GetParameterOutput{
-		"bool": &ssm.GetParameterOutput{
+		"bool": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("bool"),
 				Type:  aws.String("string"),
 				Value: aws.String("true"),
 			},
 		},
-		"int": &ssm.GetParameterOutput{
+		"int": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("int"),
 				Type:  aws.String("string"),
 				Value: aws.String("2"),
 			},
 		},
-		"int8": &ssm.GetParameterOutput{
+		"int8": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("int8"),
 				Type:  aws.String("string"),
 				Value: aws.String("3"),
 			},
 		},
-		"int16": &ssm.GetParameterOutput{
+		"int16": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("int16"),
 				Type:  aws.String("string"),
 				Value: aws.String("4"),
 			},
 		},
-		"int32": &ssm.GetParameterOutput{
+		"int32": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("int32"),
 				Type:  aws.String("string"),
 				Value: aws.String("5"),
 			},
 		},
-		"int64": &ssm.GetParameterOutput{
+		"int64": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("int64"),
 				Type:  aws.String("string"),
 				Value: aws.String("6"),
 			},
 		},
-		"uint": &ssm.GetParameterOutput{
+		"uint": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("uint"),
 				Type:  aws.String("string"),
 				Value: aws.String("7"),
 			},
 		},
-		"uint8": &ssm.GetParameterOutput{
+		"uint8": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("uint8"),
 				Type:  aws.String("string"),
 				Value: aws.String("8"),
 			},
 		},
-		"uint16": &ssm.GetParameterOutput{
+		"uint16": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("uint16"),
 				Type:  aws.String("string"),
 				Value: aws.String("9"),
 			},
 		},
-		"uint32": &ssm.GetParameterOutput{
+		"uint32": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("uint32"),
 				Type:  aws.String("string"),
 				Value: aws.String("10"),
 			},
 		},
-		"uint64": &ssm.GetParameterOutput{
+		"uint64": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("uint64"),
 				Type:  aws.String("string"),
 				Value: aws.String("11"),
 			},
 		},
-		"uintptr": &ssm.GetParameterOutput{
+		"uintptr": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("uintptr"),
 				Type:  aws.String("string"),
 				Value: aws.String("12"),
 			},
 		},
-		"float32": &ssm.GetParameterOutput{
+		"float32": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("float32"),
 				Type:  aws.String("string"),
 				Value: aws.String("12.1"),
 			},
 		},
-		"float64": &ssm.GetParameterOutput{
+		"float64": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("float64"),
 				Type:  aws.String("string"),
 				Value: aws.String("12.2"),
 			},
 		},
-		"pbool": &ssm.GetParameterOutput{
+		"pbool": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("pbool"),
 				Type:  aws.String("string"),
 				Value: aws.String("true"),
 			},
 		},
-		"pint": &ssm.GetParameterOutput{
+		"pint": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("int"),
 				Type:  aws.String("string"),
 				Value: aws.String("13"),
 			},
 		},
-		"pint8": &ssm.GetParameterOutput{
+		"pint8": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("int8"),
 				Type:  aws.String("string"),
 				Value: aws.String("14"),
 			},
 		},
-		"pint16": &ssm.GetParameterOutput{
+		"pint16": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("pint16"),
 				Type:  aws.String("string"),
 				Value: aws.String("15"),
 			},
 		},
-		"pint32": &ssm.GetParameterOutput{
+		"pint32": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("pint32"),
 				Type:  aws.String("string"),
 				Value: aws.String("16"),
 			},
 		},
-		"pint64": &ssm.GetParameterOutput{
+		"pint64": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("pint64"),
 				Type:  aws.String("string"),
 				Value: aws.String("17"),
 			},
 		},
-		"puint": &ssm.GetParameterOutput{
+		"puint": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("puint"),
 				Type:  aws.String("string"),
 				Value: aws.String("18"),
 			},
 		},
-		"puint8": &ssm.GetParameterOutput{
+		"puint8": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("puint8"),
 				Type:  aws.String("string"),
 				Value: aws.String("19"),
 			},
 		},
-		"puint16": &ssm.GetParameterOutput{
+		"puint16": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("puint16"),
 				Type:  aws.String("string"),
 				Value: aws.String("20"),
 			},
 		},
-		"puint32": &ssm.GetParameterOutput{
+		"puint32": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("puint32"),
 				Type:  aws.String("string"),
 				Value: aws.String("21"),
 			},
 		},
-		"puint64": &ssm.GetParameterOutput{
+		"puint64": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("puint64"),
 				Type:  aws.String("string"),
 				Value: aws.String("22"),
 			},
 		},
-		"puintptr": &ssm.GetParameterOutput{
+		"puintptr": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("puintptr"),
 				Type:  aws.String("string"),
 				Value: aws.String("23"),
 			},
 		},
-		"pfloat32": &ssm.GetParameterOutput{
+		"pfloat32": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("pfloat32"),
 				Type:  aws.String("string"),
 				Value: aws.String("23.1"),
 			},
 		},
-		"pfloat64": &ssm.GetParameterOutput{
+		"pfloat64": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("pfloat64"),
 				Type:  aws.String("string"),
 				Value: aws.String("23.2"),
 			},
 		},
-		"string": &ssm.GetParameterOutput{
+		"string": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("string"),
 				Type:  aws.String("string"),
 				Value: aws.String("this is a string"),
 			},
 		},
-		"pstring": &ssm.GetParameterOutput{
+		"pstring": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("pstring"),
 				Type:  aws.String("string"),
 				Value: aws.String("this is a ptr to a string"),
 			},
 		},
-		"sliceint": &ssm.GetParameterOutput{
+		"sliceint": {
 			Parameter: &ssm.Parameter{
 				Name:  aws.String("sliceint"),
 				Type:  aws.String("string"),
