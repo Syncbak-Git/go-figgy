@@ -1,5 +1,8 @@
+# go-figgy
 
-# figgy
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/Syncbak-Git/go-figgy)
+[![CircleCI](https://circleci.com/gh/Syncbak-Git/go-figgy/tree/master.svg?style=shield)](https://circleci.com/gh/Syncbak-Git/go-figgy/tree/master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Syncbak-Git/go-figgy)](https://goreportcard.com/report/github.com/Syncbak-Git/go-figgy)
 
 ## Why is this a thing?!
 We wanted to experiment with AWS's Parameter Store as a centralized system for managing out configurations.  Turns out, it is a lot of work loading them and pushing the values into configuration structs to be used by other components.  
