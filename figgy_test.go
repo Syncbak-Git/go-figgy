@@ -352,7 +352,7 @@ func TestTypeConvertErrors(t *testing.T) {
 			Int int `ssm:"string"`
 		}{}, want: &ConvertTypeError{Field: "Int", Type: "int", Value: "this is a string"}},
 		"invalid uint convert": {in: &struct {
-			Int uint `ssm:"string"`
+			UInt uint `ssm:"string"`
 		}{}, want: &ConvertTypeError{Field: "UInt", Type: "uint", Value: "this is a string"}},
 		"invalid float convert": {in: &struct {
 			Float32 float32 `ssm:"string"`
