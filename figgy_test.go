@@ -390,7 +390,7 @@ func TestTagParse(t *testing.T) {
 
 	for n, tc := range tests {
 		f := reflect.TypeOf(tc.in).Field(0) //Not the safest assumption
-		tag, err := tag(f)
+		tag, err := tag(f, nil)
 		if tc.want != nil {
 			assert.Equalf(t, tc.want.key, tag.key, "keys are do not match for test %s", n)
 			assert.Equalf(t, tc.want.decrypt, tag.decrypt, "decrypt flag does not match for test %s", n)
