@@ -2,10 +2,12 @@
 package figgy
 
 import (
+	"bytes"
 	"errors"
 	"reflect"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ssm"
@@ -80,11 +82,23 @@ func newField(key string, decrypt bool) *field {
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
 func Load(c ssmiface.SSMAPI, v interface{}) error {
+	return LoadWithParameters(c, v, nil)
+}
+
+// LoadWithParameters loads AWS Parameter Store parameters based on the defined tags, performing parameter
+// substitution on field tags using data-driven templates from "text/template".
+//
+// When a source type is an array, it is assumed the parameter being loaded
+// is a comma separated list.  The list will be split and converted to
+// match the array's typing.
+//
+// You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
+func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return &InvalidTypeError{Type: reflect.TypeOf(v)}
 	}
-	t, err := walk(rv.Elem())
+	t, err := walk(rv.Elem(), data)
 	if err != nil {
 		return err
 	}
@@ -118,7 +132,7 @@ func load(c ssmiface.SSMAPI, f []*field) error {
 }
 
 // walk the value recursively to initialize pointers and build a graph of fields and tag options
-func walk(v reflect.Value) ([]*field, error) {
+func walk(v reflect.Value, data interface{}) ([]*field, error) {
 	p := make([]*field, 0)
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
@@ -135,14 +149,14 @@ func walk(v reflect.Value) ([]*field, error) {
 		}
 		switch fv.Kind() {
 		case reflect.Struct:
-			tags, err := walk(fv)
+			tags, err := walk(fv, data)
 			if err != nil {
 				return nil, err
 			}
 			p = append(p, tags...)
 			continue
 		}
-		pf, err := tag(ft)
+		pf, err := tag(ft, data)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +170,7 @@ func walk(v reflect.Value) ([]*field, error) {
 }
 
 // tag parses the ssm tag from a given field
-func tag(f reflect.StructField) (*field, error) {
+func tag(f reflect.StructField, data interface{}) (*field, error) {
 	t := f.Tag.Get("ssm")
 	if t == "" || t == "-" {
 		return nil, nil
@@ -165,6 +179,14 @@ func tag(f reflect.StructField) (*field, error) {
 	fld := newField(strings.TrimSpace(o[0]), false)
 	if fld.key == "" {
 		return nil, &TagParseError{Tag: t, Field: f.Name}
+	}
+	tpl, err := template.New(fld.key).Parse(fld.key)
+	if err == nil {
+		b := &bytes.Buffer{}
+		err = tpl.Execute(b, data)
+		if err == nil {
+			fld.key = b.String()
+		}
 	}
 	for _, option := range o[1:] {
 		switch strings.TrimSpace(option) {

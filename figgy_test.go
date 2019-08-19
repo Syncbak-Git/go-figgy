@@ -368,6 +368,7 @@ func TestTypeConvertErrors(t *testing.T) {
 func TestTagParse(t *testing.T) {
 	tests := map[string]struct {
 		in   interface{}
+		data interface{}
 		want *field
 		err  error
 	}{
@@ -386,11 +387,15 @@ func TestTagParse(t *testing.T) {
 		"ignoreKey": {in: struct {
 			Field string `ssm:"-"`
 		}{}, want: nil, err: nil},
+		"with parameter": {in: struct {
+			Fields string `ssm:"/{{.Env}}/environment"`
+		}{}, want: &field{key: "/dev/environment"},
+			data: struct{ Env string }{"dev"}},
 	}
 
 	for n, tc := range tests {
 		f := reflect.TypeOf(tc.in).Field(0) //Not the safest assumption
-		tag, err := tag(f)
+		tag, err := tag(f, tc.data)
 		if tc.want != nil {
 			assert.Equalf(t, tc.want.key, tag.key, "keys are do not match for test %s", n)
 			assert.Equalf(t, tc.want.decrypt, tag.decrypt, "decrypt flag does not match for test %s", n)
