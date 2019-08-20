@@ -15,7 +15,7 @@ jobs:
           name: Restore dependencies
           command: |
             govendor init
-            govendor fetch +e
+            govendor fetch +m
       - run:
           name: Test package
           command: |
