@@ -9,6 +9,14 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Install govendor
+          command: go get -u github.com/kardianos/govendor
+      - run:
+          name: Restore dependencies
+          command: |
+            govendor init
+            govendor fetch +m
+      - run:
           name: Test package
           command: |
             mkdir -p ./test-results/go-unit
