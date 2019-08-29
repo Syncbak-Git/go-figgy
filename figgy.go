@@ -8,11 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 )
+
+var durationType reflect.Type = reflect.TypeOf(time.Duration(0))
 
 // InvalidTypeError descibes an invalid argument passed to Load.
 type InvalidTypeError struct {
@@ -201,6 +204,13 @@ func tag(f reflect.StructField, data interface{}) (*field, error) {
 func set(v reflect.Value, s string) error {
 	if !v.CanSet() {
 		return errors.New(v.Type().String() + " cannot be set")
+	}
+	// special case with time.Duration and assignable types
+	if v.Type().AssignableTo(durationType) {
+		if p, err := time.ParseDuration(s); err == nil {
+			v.Set(reflect.ValueOf(p))
+			return nil
+		}
 	}
 	switch v.Kind() {
 	// handles the case data types are wrapped in other constructs, EG slices
