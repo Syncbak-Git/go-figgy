@@ -275,6 +275,9 @@ func set(v reflect.Value, s string) error {
 }
 
 func unmarshaler(v reflect.Value) Unmarshaler {
+	// If v is a named type and is addressable,
+	// start with its address, so that if the type has pointer methods,
+	// we find them.
 	if v.Kind() != reflect.Ptr && v.Type().Name() != "" && v.CanAddr() {
 		v = v.Addr()
 	}
