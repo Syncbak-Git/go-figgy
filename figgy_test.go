@@ -3,6 +3,7 @@ package figgy
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -120,6 +121,20 @@ func NewMockSSMClient() *MockSSMClient {
 				Name:  aws.String("float64"),
 				Type:  aws.String("string"),
 				Value: aws.String("12.2"),
+			},
+		},
+		"duration": {
+			Parameter: &ssm.Parameter{
+				Name:  aws.String("duration"),
+				Type:  aws.String("string"),
+				Value: aws.String("3600000000000"),
+			},
+		},
+		"durationstring": {
+			Parameter: &ssm.Parameter{
+				Name:  aws.String("durationstring"),
+				Type:  aws.String("string"),
+				Value: aws.String("3600s"),
 			},
 		},
 		"pbool": {
@@ -241,6 +256,20 @@ func NewMockSSMClient() *MockSSMClient {
 				Value: aws.String("1,2,3,4,5"),
 			},
 		},
+		"pduration": {
+			Parameter: &ssm.Parameter{
+				Name:  aws.String("pduration"),
+				Type:  aws.String("string"),
+				Value: aws.String("3600000000000"),
+			},
+		},
+		"pdurationString": {
+			Parameter: &ssm.Parameter{
+				Name:  aws.String("pdurationstring"),
+				Type:  aws.String("string"),
+				Value: aws.String("3600s"),
+			},
+		},
 	}
 	return m
 }
@@ -252,20 +281,26 @@ func NewTypes() *Types {
 }
 
 type Types struct {
-	Bool    bool    `ssm:"bool"`
-	Int     int     `ssm:"int"`
-	Int8    int8    `ssm:"int8"`
-	Int16   int16   `ssm:"int16"`
-	Int32   int32   `ssm:"int32"`
-	Int64   int64   `ssm:"int64"`
-	Uint    uint    `ssm:"uint"`
-	Uint8   uint8   `ssm:"uint8"`
-	Uint16  uint16  `ssm:"uint16"`
-	Uint32  uint32  `ssm:"uint32"`
-	Uint64  uint64  `ssm:"uint64"`
-	Uintptr uintptr `ssm:"uintptr"`
-	Float32 float32 `ssm:"float32"`
-	Float64 float64 `ssm:"float64"`
+	Bool           bool          `ssm:"bool"`
+	Int            int           `ssm:"int"`
+	Int8           int8          `ssm:"int8"`
+	Int16          int16         `ssm:"int16"`
+	Int32          int32         `ssm:"int32"`
+	Int64          int64         `ssm:"int64"`
+	Uint           uint          `ssm:"uint"`
+	Uint8          uint8         `ssm:"uint8"`
+	Uint16         uint16        `ssm:"uint16"`
+	Uint32         uint32        `ssm:"uint32"`
+	Uint64         uint64        `ssm:"uint64"`
+	Uintptr        uintptr       `ssm:"uintptr"`
+	Float32        float32       `ssm:"float32"`
+	Float64        float64       `ssm:"float64"`
+	Duration       time.Duration `ssm:"duration"`
+	DurationString time.Duration `ssm:"durationstring"`
+
+	//DurationType  duration `ssm:"duration"`
+	//DurationType2 duration `ssm:"durationstring"`
+
 	//UintptrStr uintptr
 
 	PBool    *bool    `ssm:"pbool"`
@@ -304,6 +339,8 @@ type Types struct {
 	*/
 	unexported int
 }
+
+type duration time.Duration
 
 type Nested struct {
 	String  string  `ssm:"string"`
@@ -357,6 +394,9 @@ func TestTypeConvertErrors(t *testing.T) {
 		"invalid float convert": {in: &struct {
 			Float32 float32 `ssm:"string"`
 		}{}, want: &ConvertTypeError{Field: "Float32", Type: "float32", Value: "this is a string"}},
+		"invalid time.Duration convert": {in: &struct {
+			Duration time.Duration `ssm:"string"`
+		}{}, want: &ConvertTypeError{Field: "Duration", Type: "time.Duration", Value: "this is a string"}},
 	}
 
 	for n, tc := range tests {
