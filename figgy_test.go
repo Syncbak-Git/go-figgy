@@ -305,6 +305,13 @@ type Types struct {
 	unexported int
 }
 
+type str string
+
+func (c *str) UnmarshalParameter(s string) error {
+	*c = str("cs-" + s)
+	return nil
+}
+
 type Nested struct {
 	String  string  `ssm:"string"`
 	PString *string `ssm:"pstring"`
@@ -337,6 +344,31 @@ func TestTypeConvert(t *testing.T) {
 	err := Load(NewMockSSMClient(), ex)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestUnmarshalIface(t *testing.T) {
+	tests := map[string]struct {
+		in   interface{}
+		want interface{}
+	}{
+		"unmarshal string type alias": {
+			in: &struct {
+				AliasString str `ssm:"string"`
+			}{},
+			want: &struct {
+				AliasString str
+			}{
+				AliasString: "cs-this is a string",
+			},
+		}}
+
+	for n, tc := range tests {
+		err := Load(NewMockSSMClient(), tc.in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.EqualValues(t, tc.in, tc.want, "test '%s' failed", n)
 	}
 }
 
