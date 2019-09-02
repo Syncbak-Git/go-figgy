@@ -422,6 +422,29 @@ func TestTypeConvertErrors(t *testing.T) {
 	}
 }
 
+func TestInvalidParams(t *testing.T) {
+	var c struct {
+		Invalid string `ssm:"/no/such/param"`
+	}
+	err := Load(NewMockSSMClient(), &c)
+	assert.Error(t, err)
+}
+
+func TestMixedPlainAndDecryptParams(t *testing.T) {
+	var c struct {
+		Plain1   string `ssm:"string"`
+		Plain2   bool   `ssm:"bool"`
+		Decrypt1 int    `ssm:"int,decrypt"`
+		Decrypt2 int32  `ssm:"int32,decrypt"`
+	}
+	err := Load(NewMockSSMClient(), &c)
+	assert.NoError(t, err)
+	assert.Equal(t, c.Plain1, "this is a string")
+	assert.Equal(t, c.Plain2, true)
+	assert.Equal(t, c.Decrypt1, 2)
+	assert.Equal(t, c.Decrypt2, int32(5))
+}
+
 func TestTagParse(t *testing.T) {
 	tests := map[string]struct {
 		in   interface{}
@@ -461,4 +484,52 @@ func TestTagParse(t *testing.T) {
 			assert.EqualError(t, err, tc.err.Error())
 		}
 	}
+}
+
+func TestPartition(t *testing.T) {
+	var tests = []struct {
+		in   []bool
+		lenp int
+		lend int
+	}{
+		{nil, 0, 0},
+		{[]bool{}, 0, 0},
+		{[]bool{false}, 1, 0},
+		{[]bool{true}, 0, 1},
+		{[]bool{false, true}, 1, 1},
+		{[]bool{true, false}, 1, 1},
+		{[]bool{false, false}, 2, 0},
+		{[]bool{true, true}, 0, 2},
+		{[]bool{true, false, true}, 1, 2},
+		{[]bool{false, true, false}, 2, 1},
+		{[]bool{false, false, true}, 2, 1},
+		{[]bool{true, false, false}, 2, 1},
+		{[]bool{false, false, false}, 3, 0},
+		{[]bool{true, true, true}, 0, 3},
+	}
+	for _, x := range tests {
+		f := makePartitionFields(x.in)
+		plain, decrypt := partitionFields(f, func(x *field) bool {
+			return x.decrypt
+		})
+		assert.Len(t, plain, x.lenp)
+		assert.Len(t, decrypt, x.lend)
+		for i := range plain {
+			assert.Equal(t, false, plain[i].decrypt)
+		}
+		for i := range decrypt {
+			assert.Equal(t, true, decrypt[i].decrypt)
+		}
+	}
+}
+
+func makePartitionFields(x []bool) []*field {
+	if x == nil {
+		return nil
+	}
+	f := make([]*field, len(x))
+	for i := range x {
+		f[i] = &field{decrypt: x[i]}
+	}
+	return f
 }
