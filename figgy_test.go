@@ -1,6 +1,7 @@
 package figgy
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -20,6 +21,22 @@ type MockSSMClient struct {
 func (c MockSSMClient) GetParameter(i *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
 	//TODO: Lookup key and mimic more closely how the aws sdk works, no key causes a panic
 	return c.Data[*i.Name], nil
+}
+
+func (c MockSSMClient) GetParameters(i *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
+	var out = new(ssm.GetParametersOutput)
+	if len(i.Names) > maxParameters {
+		return nil, fmt.Errorf("max parameters exceeded: received %d, max %d", len(i.Names), maxParameters)
+	}
+	for _, n := range i.Names {
+		p, ok := c.Data[aws.StringValue(n)]
+		if !ok {
+			out.InvalidParameters = append(out.InvalidParameters, n)
+		} else {
+			out.Parameters = append(out.Parameters, p.Parameter)
+		}
+	}
+	return out, nil
 }
 
 func NewMockSSMClient() *MockSSMClient {
@@ -146,14 +163,14 @@ func NewMockSSMClient() *MockSSMClient {
 		},
 		"pint": {
 			Parameter: &ssm.Parameter{
-				Name:  aws.String("int"),
+				Name:  aws.String("pint"),
 				Type:  aws.String("string"),
 				Value: aws.String("13"),
 			},
 		},
 		"pint8": {
 			Parameter: &ssm.Parameter{
-				Name:  aws.String("int8"),
+				Name:  aws.String("pint8"),
 				Type:  aws.String("string"),
 				Value: aws.String("14"),
 			},
