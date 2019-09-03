@@ -1,6 +1,7 @@
 package figgy
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -20,6 +21,22 @@ type MockSSMClient struct {
 func (c MockSSMClient) GetParameter(i *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
 	//TODO: Lookup key and mimic more closely how the aws sdk works, no key causes a panic
 	return c.Data[*i.Name], nil
+}
+
+func (c MockSSMClient) GetParameters(i *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
+	var out = new(ssm.GetParametersOutput)
+	if len(i.Names) > maxParameters {
+		return nil, fmt.Errorf("max parameters exceeded: received %d, max %d", len(i.Names), maxParameters)
+	}
+	for _, n := range i.Names {
+		p, ok := c.Data[aws.StringValue(n)]
+		if !ok {
+			out.InvalidParameters = append(out.InvalidParameters, n)
+		} else {
+			out.Parameters = append(out.Parameters, p.Parameter)
+		}
+	}
+	return out, nil
 }
 
 func NewMockSSMClient() *MockSSMClient {
@@ -146,14 +163,14 @@ func NewMockSSMClient() *MockSSMClient {
 		},
 		"pint": {
 			Parameter: &ssm.Parameter{
-				Name:  aws.String("int"),
+				Name:  aws.String("pint"),
 				Type:  aws.String("string"),
 				Value: aws.String("13"),
 			},
 		},
 		"pint8": {
 			Parameter: &ssm.Parameter{
-				Name:  aws.String("int8"),
+				Name:  aws.String("pint8"),
 				Type:  aws.String("string"),
 				Value: aws.String("14"),
 			},
@@ -453,6 +470,29 @@ func TestTypeConvertErrors(t *testing.T) {
 	}
 }
 
+func TestInvalidParams(t *testing.T) {
+	var c struct {
+		Invalid string `ssm:"/no/such/param"`
+	}
+	err := Load(NewMockSSMClient(), &c)
+	assert.Error(t, err)
+}
+
+func TestMixedPlainAndDecryptParams(t *testing.T) {
+	var c struct {
+		Plain1   string `ssm:"string"`
+		Plain2   bool   `ssm:"bool"`
+		Decrypt1 int    `ssm:"int,decrypt"`
+		Decrypt2 int32  `ssm:"int32,decrypt"`
+	}
+	err := Load(NewMockSSMClient(), &c)
+	assert.NoError(t, err)
+	assert.Equal(t, c.Plain1, "this is a string")
+	assert.Equal(t, c.Plain2, true)
+	assert.Equal(t, c.Decrypt1, 2)
+	assert.Equal(t, c.Decrypt2, int32(5))
+}
+
 type JSONTest struct {
 	JSON  SimpleJSON  `ssm:"simplejson,json"`
 	PJSON *SimpleJSON `ssm:"simplejson,json"`
@@ -539,4 +579,52 @@ func TestTagParse(t *testing.T) {
 			assert.EqualError(t, err, tc.err.Error())
 		}
 	}
+}
+
+func TestPartition(t *testing.T) {
+	var tests = []struct {
+		in   []bool
+		lenp int
+		lend int
+	}{
+		{nil, 0, 0},
+		{[]bool{}, 0, 0},
+		{[]bool{false}, 1, 0},
+		{[]bool{true}, 0, 1},
+		{[]bool{false, true}, 1, 1},
+		{[]bool{true, false}, 1, 1},
+		{[]bool{false, false}, 2, 0},
+		{[]bool{true, true}, 0, 2},
+		{[]bool{true, false, true}, 1, 2},
+		{[]bool{false, true, false}, 2, 1},
+		{[]bool{false, false, true}, 2, 1},
+		{[]bool{true, false, false}, 2, 1},
+		{[]bool{false, false, false}, 3, 0},
+		{[]bool{true, true, true}, 0, 3},
+	}
+	for _, x := range tests {
+		f := makePartitionFields(x.in)
+		plain, decrypt := partitionFields(f, func(x *field) bool {
+			return x.decrypt
+		})
+		assert.Len(t, plain, x.lenp)
+		assert.Len(t, decrypt, x.lend)
+		for i := range plain {
+			assert.Equal(t, false, plain[i].decrypt)
+		}
+		for i := range decrypt {
+			assert.Equal(t, true, decrypt[i].decrypt)
+		}
+	}
+}
+
+func makePartitionFields(x []bool) []*field {
+	if x == nil {
+		return nil
+	}
+	f := make([]*field, len(x))
+	for i := range x {
+		f[i] = &field{decrypt: x[i]}
+	}
+	return f
 }
