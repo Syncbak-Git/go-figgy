@@ -489,6 +489,14 @@ func TestJSONError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestJSONWithUnmarshallerError(t *testing.T) {
+	var j struct {
+		Test str `ssm:"string,json"`
+	}
+	err := Load(NewMockSSMClient(), &j)
+	assert.Error(t, err)
+}
+
 func TestTagParse(t *testing.T) {
 	tests := map[string]struct {
 		in   interface{}
