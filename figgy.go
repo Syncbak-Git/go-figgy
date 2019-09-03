@@ -17,6 +17,10 @@ import (
 
 var durationType reflect.Type = reflect.TypeOf(time.Duration(0))
 
+type Unmarshaler interface {
+	UnmarshalParameter(string) error
+}
+
 // InvalidTypeError descibes an invalid argument passed to Load.
 type InvalidTypeError struct {
 	Type reflect.Type
@@ -205,6 +209,9 @@ func set(v reflect.Value, s string) error {
 	if !v.CanSet() {
 		return errors.New(v.Type().String() + " cannot be set")
 	}
+	if u := unmarshaler(v); u != nil {
+		return u.UnmarshalParameter(s)
+	}
 	// special case with time.Duration and assignable types
 	if v.Type().AssignableTo(durationType) {
 		if p, err := time.ParseDuration(s); err == nil {
@@ -273,6 +280,21 @@ func set(v reflect.Value, s string) error {
 		}
 		v.SetFloat(n)
 		break
+	}
+	return nil
+}
+
+func unmarshaler(v reflect.Value) Unmarshaler {
+	// If v is a named type and is addressable,
+	// start with its address, so that if the type has pointer methods,
+	// we find them.
+	if v.Kind() != reflect.Ptr && v.Type().Name() != "" && v.CanAddr() {
+		v = v.Addr()
+	}
+	if v.Type().NumMethod() > 0 && v.CanInterface() {
+		if u, ok := v.Interface().(Unmarshaler); ok {
+			return u
+		}
 	}
 	return nil
 }
