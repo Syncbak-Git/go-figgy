@@ -3,7 +3,9 @@ package figgy
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -70,6 +72,7 @@ func (e *ConvertTypeError) Error() string {
 type field struct {
 	key     string
 	decrypt bool
+	json    bool
 	value   reflect.Value
 	field   reflect.StructField
 }
@@ -124,7 +127,7 @@ func load(c ssmiface.SSMAPI, f []*field) error {
 		if err != nil {
 			return err
 		}
-		err = set(x.value, *out.Parameter.Value)
+		err = set(x, *out.Parameter.Value)
 		if err != nil {
 			switch err := err.(type) {
 			case *ConvertTypeError:
@@ -154,15 +157,6 @@ func walk(v reflect.Value, data interface{}) ([]*field, error) {
 			fv.Set(reflect.New(fv.Type().Elem()))
 			fv = reflect.Indirect(fv)
 		}
-		switch fv.Kind() {
-		case reflect.Struct:
-			tags, err := walk(fv, data)
-			if err != nil {
-				return nil, err
-			}
-			p = append(p, tags...)
-			continue
-		}
 		pf, err := tag(ft, data)
 		if err != nil {
 			return nil, err
@@ -171,6 +165,17 @@ func walk(v reflect.Value, data interface{}) ([]*field, error) {
 			pf.field = ft
 			pf.value = fv
 			p = append(p, pf)
+		} else {
+			// only walk down embedded structs with no 'ssm' tag
+			switch fv.Kind() {
+			case reflect.Struct:
+				tags, err := walk(fv, data)
+				if err != nil {
+					return nil, err
+				}
+				p = append(p, tags...)
+				continue
+			}
 		}
 	}
 	return p, nil
@@ -199,18 +204,27 @@ func tag(f reflect.StructField, data interface{}) (*field, error) {
 		switch strings.TrimSpace(option) {
 		case "decrypt":
 			fld.decrypt = true
+		case "json":
+			fld.json = true
 		}
 	}
 	return fld, nil
 }
 
 // set will attempt to set the underlying value based on the value's type
-func set(v reflect.Value, s string) error {
+func set(f *field, s string) error {
+	v := f.value
 	if !v.CanSet() {
 		return errors.New(v.Type().String() + " cannot be set")
 	}
 	if u := unmarshaler(v); u != nil {
+		if f.json {
+			return fmt.Errorf("cannot use 'json' option on a type with a custom unmarshaller: %s %s", f.field.Name, f.field.Type.String())
+		}
 		return u.UnmarshalParameter(s)
+	}
+	if f.json {
+		return setJSON(f, s)
 	}
 	// special case with time.Duration and assignable types
 	if v.Type().AssignableTo(durationType) {
@@ -224,7 +238,7 @@ func set(v reflect.Value, s string) error {
 	case reflect.Ptr:
 		// create new pointer to a zero value
 		new := reflect.New(v.Type().Elem())
-		set(new.Elem(), s)
+		set(&field{value: new.Elem()}, s)
 		// assign new pointer
 		v.Set(new)
 		break
@@ -234,7 +248,7 @@ func set(v reflect.Value, s string) error {
 		sz := len(l)
 		v.Set(reflect.MakeSlice(v.Type(), sz, sz))
 		for i, w := range l {
-			set(v.Index(i), w)
+			set(&field{value: v.Index(i)}, w)
 		}
 		break
 	case reflect.String:
@@ -295,6 +309,23 @@ func unmarshaler(v reflect.Value) Unmarshaler {
 		if u, ok := v.Interface().(Unmarshaler); ok {
 			return u
 		}
+	}
+	return nil
+}
+
+func setJSON(f *field, s string) error {
+	v := f.value
+	if v.Kind() != reflect.Ptr {
+		if !v.CanAddr() {
+			return fmt.Errorf("%s is not addressable", v.Type().String())
+		}
+		v = v.Addr()
+	}
+	if !v.CanInterface() {
+		return fmt.Errorf("%s is not interfaceable", v.Type().String())
+	}
+	if err := json.Unmarshal([]byte(s), v.Interface()); err != nil {
+		return fmt.Errorf("json unmarshal error for field '%s'", f.field.Name)
 	}
 	return nil
 }

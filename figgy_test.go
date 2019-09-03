@@ -270,6 +270,27 @@ func NewMockSSMClient() *MockSSMClient {
 				Value: aws.String("3600s"),
 			},
 		},
+		"simplejson": {
+			Parameter: &ssm.Parameter{
+				Name:  aws.String("simplejson"),
+				Type:  aws.String("string"),
+				Value: aws.String(`{"F1": 1, "F2": "2"}`),
+			},
+		},
+		"simplejsonarray": {
+			Parameter: &ssm.Parameter{
+				Name:  aws.String("simplejsonarray"),
+				Type:  aws.String("string"),
+				Value: aws.String(`[{"F1": 1, "F2": "2"}]`),
+			},
+		},
+		"badjson": {
+			Parameter: &ssm.Parameter{
+				Name:  aws.String("badjson"),
+				Type:  aws.String("string"),
+				Value: aws.String("invalid"),
+			},
+		},
 	}
 	return m
 }
@@ -432,6 +453,50 @@ func TestTypeConvertErrors(t *testing.T) {
 	}
 }
 
+type JSONTest struct {
+	JSON  SimpleJSON  `ssm:"simplejson,json"`
+	PJSON *SimpleJSON `ssm:"simplejson,json"`
+	EJSON struct {
+		F1 int
+		F2 string
+	} `ssm:"simplejson,json"`
+	AJSON []SimpleJSON `ssm:"simplejsonarray,json"`
+}
+
+type SimpleJSON struct {
+	F1 int
+	F2 string
+}
+
+func TestJSON(t *testing.T) {
+	var j JSONTest
+	err := Load(NewMockSSMClient(), &j)
+	assert.NoError(t, err)
+	s := SimpleJSON{F1: 1, F2: "2"}
+	assert.Equal(t, s, j.JSON)
+	assert.NotNil(t, j.PJSON)
+	assert.Equal(t, s, *j.PJSON)
+	assert.EqualValues(t, s, j.EJSON)
+	assert.Len(t, j.AJSON, 1)
+	assert.Equal(t, s, j.AJSON[0])
+}
+
+func TestJSONError(t *testing.T) {
+	var j struct {
+		SimpleJSON `ssm:"badjson,json"`
+	}
+	err := Load(NewMockSSMClient(), &j)
+	assert.Error(t, err)
+}
+
+func TestJSONWithUnmarshallerError(t *testing.T) {
+	var j struct {
+		Test str `ssm:"string,json"`
+	}
+	err := Load(NewMockSSMClient(), &j)
+	assert.Error(t, err)
+}
+
 func TestTagParse(t *testing.T) {
 	tests := map[string]struct {
 		in   interface{}
@@ -458,6 +523,9 @@ func TestTagParse(t *testing.T) {
 			Fields string `ssm:"/{{.Env}}/environment"`
 		}{}, want: &field{key: "/dev/environment"},
 			data: struct{ Env string }{"dev"}},
+		"with json": {in: struct {
+			Field string `ssm:"simplejson,json"`
+		}{}, want: &field{key: "simplejson", json: true}, err: nil},
 	}
 
 	for n, tc := range tests {
