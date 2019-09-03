@@ -300,7 +300,6 @@ func setJSON(f *field, s string) error {
 		return fmt.Errorf("%s is not interfaceable", v.Type().String())
 	}
 	if err := json.Unmarshal([]byte(s), v.Interface()); err != nil {
-		fmt.Println(err.Error())
 		return fmt.Errorf("json unmarshal error for field '%s'", f.field.Name)
 	}
 	return nil
