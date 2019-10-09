@@ -87,6 +87,9 @@ func newField(key string, decrypt bool) *field {
 	}
 }
 
+type P Params
+type Params map[string]interface{}
+
 // Load AWS Parameter Store parameters based on the defined tags.
 //
 // When a source type is an array, it is assumed the parameter being loaded
