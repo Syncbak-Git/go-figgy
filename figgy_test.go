@@ -560,9 +560,9 @@ func TestTagParse(t *testing.T) {
 			Field string `ssm:"-"`
 		}{}, want: nil, err: nil},
 		"with parameter": {in: struct {
-			Fields string `ssm:"/{{.Env}}/environment"`
+			Fields string `ssm:"/{{.env}}/environment"`
 		}{}, want: &field{key: "/dev/environment"},
-			data: struct{ Env string }{"dev"}},
+			data: P{"env": "dev"}},
 		"with json": {in: struct {
 			Field string `ssm:"simplejson,json"`
 		}{}, want: &field{key: "simplejson", json: true}, err: nil},

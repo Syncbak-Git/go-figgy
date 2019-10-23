@@ -87,6 +87,9 @@ func newField(key string, decrypt bool) *field {
 	}
 }
 
+// P is a convenience alias for passing paramters to LoadWithParameters
+type P map[string]interface{}
+
 // Load AWS Parameter Store parameters based on the defined tags.
 //
 // When a source type is an array, it is assumed the parameter being loaded
