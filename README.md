@@ -32,13 +32,27 @@ cfg := Config{}
 figgy.Load(ssmClient, &cfg)
 ```
 
+## Runtime parameters
+
+You can have a parameter defined at runtime by using the `LoadWithParameters` function:
+
+``` go
+type Config struct{
+    Server   string `ssm:"/myapp/{{.env}}/server"`
+    Port     int    `ssm:"/myapp/{{.env}}/port"`
+    Password string `ssm:"/myapp/{{.env}}/password,decrypt"`
+}
+
+cfg := Config{}
+figgy.LoadWithParameters(ssmClient, &cfg, figgy.P{"env": "prod"})
+```
+
+Using `Server` as an example, this will be computed to a key of `/myapp/prod/server` at runtime.
+
 ## The Future
 
 Here are some additional features we would like to see in the near future:
 
 - Support type conversions for map type and slices of structs
-- Pass in load parameters to configure how parameters can be loaded
-  - prefix/suffix to always append to parameter keys
 - Allow tags defined on a parent struct to influence the child field tags
   - This is similar to how the xml package handles unmarshaling
-- Allow tags with like pathing to be grouped together to minimize calls
