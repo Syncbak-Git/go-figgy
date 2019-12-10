@@ -404,14 +404,14 @@ func TestNonPtrAndNilInput(t *testing.T) {
 
 	m := NewMockSSMClient()
 	for n, tc := range tests {
-		err := Load(m, tc.in)
+		_, err := Load(m, tc.in)
 		assert.EqualErrorf(t, err, tc.want.Error(), "unexpected error while executing test %s", n)
 	}
 }
 
 func TestTypeConvert(t *testing.T) {
 	ex := NewTypes()
-	err := Load(NewMockSSMClient(), ex)
+	_, err := Load(NewMockSSMClient(), ex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +434,7 @@ func TestUnmarshalIface(t *testing.T) {
 		}}
 
 	for n, tc := range tests {
-		err := Load(NewMockSSMClient(), tc.in)
+		_, err := Load(NewMockSSMClient(), tc.in)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -465,7 +465,7 @@ func TestTypeConvertErrors(t *testing.T) {
 	}
 
 	for n, tc := range tests {
-		err := Load(NewMockSSMClient(), tc.in)
+		_, err := Load(NewMockSSMClient(), tc.in)
 		assert.EqualError(t, err, tc.want.Error(), "test '%s' failed", n)
 	}
 }
@@ -474,7 +474,7 @@ func TestInvalidParams(t *testing.T) {
 	var c struct {
 		Invalid string `ssm:"/no/such/param"`
 	}
-	err := Load(NewMockSSMClient(), &c)
+	_, err := Load(NewMockSSMClient(), &c)
 	assert.Error(t, err)
 }
 
@@ -485,7 +485,7 @@ func TestMixedPlainAndDecryptParams(t *testing.T) {
 		Decrypt1 int    `ssm:"int,decrypt"`
 		Decrypt2 int32  `ssm:"int32,decrypt"`
 	}
-	err := Load(NewMockSSMClient(), &c)
+	_, err := Load(NewMockSSMClient(), &c)
 	assert.NoError(t, err)
 	assert.Equal(t, c.Plain1, "this is a string")
 	assert.Equal(t, c.Plain2, true)
@@ -510,7 +510,7 @@ type SimpleJSON struct {
 
 func TestJSON(t *testing.T) {
 	var j JSONTest
-	err := Load(NewMockSSMClient(), &j)
+	_, err := Load(NewMockSSMClient(), &j)
 	assert.NoError(t, err)
 	s := SimpleJSON{F1: 1, F2: "2"}
 	assert.Equal(t, s, j.JSON)
@@ -525,7 +525,7 @@ func TestJSONError(t *testing.T) {
 	var j struct {
 		SimpleJSON `ssm:"badjson,json"`
 	}
-	err := Load(NewMockSSMClient(), &j)
+	_, err := Load(NewMockSSMClient(), &j)
 	assert.Error(t, err)
 }
 
@@ -533,7 +533,7 @@ func TestJSONWithUnmarshallerError(t *testing.T) {
 	var j struct {
 		Test str `ssm:"string,json"`
 	}
-	err := Load(NewMockSSMClient(), &j)
+	_, err := Load(NewMockSSMClient(), &j)
 	assert.Error(t, err)
 }
 

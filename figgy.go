@@ -121,6 +121,9 @@ func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) (Wat
 	if err = load(c, t); err != nil {
 		return defaultWatcher{}, err
 	}
+	if !reflect.ValueOf(data).IsValid() {
+		return defaultWatcher{}, err
+	}
 	return defaultWatcher{
 		ssm: c,
 		v:   v,
