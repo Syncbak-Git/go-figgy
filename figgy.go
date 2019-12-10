@@ -97,7 +97,7 @@ type P map[string]interface{}
 // match the array's typing.
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
-func Load(c ssmiface.SSMAPI, v interface{}) error {
+func Load(c ssmiface.SSMAPI, v interface{}) (Watcher, error) {
 	return LoadWithParameters(c, v, nil)
 }
 
@@ -109,16 +109,25 @@ func Load(c ssmiface.SSMAPI, v interface{}) error {
 // match the array's typing.
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
-func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) error {
+func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) (Watcher, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return &InvalidTypeError{Type: reflect.TypeOf(v)}
+		return defaultWatcher{}, &InvalidTypeError{Type: reflect.TypeOf(v)}
 	}
 	t, err := walk(rv.Elem(), data)
 	if err != nil {
-		return err
+		return defaultWatcher{}, err
 	}
-	return load(c, t)
+	if err = load(c, t); err != nil {
+		return defaultWatcher{}, err
+	}
+	return defaultWatcher{
+		ssm: c,
+		v:   v,
+		//make copy of data
+		data: reflect.New(reflect.ValueOf(data).Elem().Type()).Interface(),
+		hash: hash(data),
+	}, err
 }
 
 // load fields from AWS Parameter Store
