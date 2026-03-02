@@ -7,309 +7,79 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 )
 
-type MockSSMClient struct {
-	ssmiface.SSMAPI
-	Data map[string]*ssm.GetParameterOutput
+type MockClient struct {
+	Data      map[string]string
+	batchSize int
 }
 
-func (c MockSSMClient) GetParameter(i *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
-	//TODO: Lookup key and mimic more closely how the aws sdk works, no key causes a panic
-	return c.Data[*i.Name], nil
-}
-
-func (c MockSSMClient) GetParameters(i *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
-	var out = new(ssm.GetParametersOutput)
-	if len(i.Names) > maxParameters {
-		return nil, fmt.Errorf("max parameters exceeded: received %d, max %d", len(i.Names), maxParameters)
+func (c *MockClient) GetValues(keys []string) (map[string]string, error) {
+	if c.batchSize > 0 && len(keys) > c.batchSize {
+		return nil, fmt.Errorf("max parameters exceeded: received %d, max %d", len(keys), c.batchSize)
 	}
-	for _, n := range i.Names {
-		p, ok := c.Data[aws.StringValue(n)]
+	out := make(map[string]string, len(keys))
+	for _, k := range keys {
+		v, ok := c.Data[k]
 		if !ok {
-			out.InvalidParameters = append(out.InvalidParameters, n)
-		} else {
-			out.Parameters = append(out.Parameters, p.Parameter)
+			return nil, fmt.Errorf("invalid parameters: %s", k)
 		}
+		out[k] = v
 	}
 	return out, nil
 }
 
-func NewMockSSMClient() *MockSSMClient {
-	m := &MockSSMClient{}
-	m.Data = map[string]*ssm.GetParameterOutput{
-		"bool": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("bool"),
-				Type:  aws.String("string"),
-				Value: aws.String("true"),
-			},
-		},
-		"int": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int"),
-				Type:  aws.String("string"),
-				Value: aws.String("2"),
-			},
-		},
-		"int8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int8"),
-				Type:  aws.String("string"),
-				Value: aws.String("3"),
-			},
-		},
-		"int16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int16"),
-				Type:  aws.String("string"),
-				Value: aws.String("4"),
-			},
-		},
-		"int32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int32"),
-				Type:  aws.String("string"),
-				Value: aws.String("5"),
-			},
-		},
-		"int64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int64"),
-				Type:  aws.String("string"),
-				Value: aws.String("6"),
-			},
-		},
-		"uint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint"),
-				Type:  aws.String("string"),
-				Value: aws.String("7"),
-			},
-		},
-		"uint8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint8"),
-				Type:  aws.String("string"),
-				Value: aws.String("8"),
-			},
-		},
-		"uint16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint16"),
-				Type:  aws.String("string"),
-				Value: aws.String("9"),
-			},
-		},
-		"uint32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint32"),
-				Type:  aws.String("string"),
-				Value: aws.String("10"),
-			},
-		},
-		"uint64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint64"),
-				Type:  aws.String("string"),
-				Value: aws.String("11"),
-			},
-		},
-		"uintptr": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uintptr"),
-				Type:  aws.String("string"),
-				Value: aws.String("12"),
-			},
-		},
-		"float32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("float32"),
-				Type:  aws.String("string"),
-				Value: aws.String("12.1"),
-			},
-		},
-		"float64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("float64"),
-				Type:  aws.String("string"),
-				Value: aws.String("12.2"),
-			},
-		},
-		"duration": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("duration"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600000000000"),
-			},
-		},
-		"durationstring": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("durationstring"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600s"),
-			},
-		},
-		"pbool": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pbool"),
-				Type:  aws.String("string"),
-				Value: aws.String("true"),
-			},
-		},
-		"pint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint"),
-				Type:  aws.String("string"),
-				Value: aws.String("13"),
-			},
-		},
-		"pint8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint8"),
-				Type:  aws.String("string"),
-				Value: aws.String("14"),
-			},
-		},
-		"pint16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint16"),
-				Type:  aws.String("string"),
-				Value: aws.String("15"),
-			},
-		},
-		"pint32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint32"),
-				Type:  aws.String("string"),
-				Value: aws.String("16"),
-			},
-		},
-		"pint64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint64"),
-				Type:  aws.String("string"),
-				Value: aws.String("17"),
-			},
-		},
-		"puint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint"),
-				Type:  aws.String("string"),
-				Value: aws.String("18"),
-			},
-		},
-		"puint8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint8"),
-				Type:  aws.String("string"),
-				Value: aws.String("19"),
-			},
-		},
-		"puint16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint16"),
-				Type:  aws.String("string"),
-				Value: aws.String("20"),
-			},
-		},
-		"puint32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint32"),
-				Type:  aws.String("string"),
-				Value: aws.String("21"),
-			},
-		},
-		"puint64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint64"),
-				Type:  aws.String("string"),
-				Value: aws.String("22"),
-			},
-		},
-		"puintptr": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puintptr"),
-				Type:  aws.String("string"),
-				Value: aws.String("23"),
-			},
-		},
-		"pfloat32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pfloat32"),
-				Type:  aws.String("string"),
-				Value: aws.String("23.1"),
-			},
-		},
-		"pfloat64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pfloat64"),
-				Type:  aws.String("string"),
-				Value: aws.String("23.2"),
-			},
-		},
-		"string": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("string"),
-				Type:  aws.String("string"),
-				Value: aws.String("this is a string"),
-			},
-		},
-		"pstring": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pstring"),
-				Type:  aws.String("string"),
-				Value: aws.String("this is a ptr to a string"),
-			},
-		},
-		"sliceint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("sliceint"),
-				Type:  aws.String("string"),
-				Value: aws.String("1,2,3,4,5"),
-			},
-		},
-		"pduration": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pduration"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600000000000"),
-			},
-		},
-		"pdurationString": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pdurationstring"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600s"),
-			},
-		},
-		"simplejson": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("simplejson"),
-				Type:  aws.String("string"),
-				Value: aws.String(`{"F1": 1, "F2": "2"}`),
-			},
-		},
-		"simplejsonarray": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("simplejsonarray"),
-				Type:  aws.String("string"),
-				Value: aws.String(`[{"F1": 1, "F2": "2"}]`),
-			},
-		},
-		"badjson": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("badjson"),
-				Type:  aws.String("string"),
-				Value: aws.String("invalid"),
-			},
+func (c *MockClient) BatchSize() int {
+	if c.batchSize > 0 {
+		return c.batchSize
+	}
+	return 10
+}
+
+func NewMockClient() *MockClient {
+	return &MockClient{
+		batchSize: 10,
+		Data: map[string]string{
+			"bool":             "true",
+			"int":              "2",
+			"int8":             "3",
+			"int16":            "4",
+			"int32":            "5",
+			"int64":            "6",
+			"uint":             "7",
+			"uint8":            "8",
+			"uint16":           "9",
+			"uint32":           "10",
+			"uint64":           "11",
+			"uintptr":          "12",
+			"float32":          "12.1",
+			"float64":          "12.2",
+			"duration":         "3600000000000",
+			"durationstring":   "3600s",
+			"pbool":            "true",
+			"pint":             "13",
+			"pint8":            "14",
+			"pint16":           "15",
+			"pint32":           "16",
+			"pint64":           "17",
+			"puint":            "18",
+			"puint8":           "19",
+			"puint16":          "20",
+			"puint32":          "21",
+			"puint64":          "22",
+			"puintptr":         "23",
+			"pfloat32":         "23.1",
+			"pfloat64":         "23.2",
+			"string":           "this is a string",
+			"pstring":          "this is a ptr to a string",
+			"sliceint":         "1,2,3,4,5",
+			"pduration":        "3600000000000",
+			"pdurationstring":  "3600s",
+			"simplejson":       `{"F1": 1, "F2": "2"}`,
+			"simplejsonarray":  `[{"F1": 1, "F2": "2"}]`,
+			"badjson":          "invalid",
 		},
 	}
-	return m
 }
 
 func NewTypes() *Types {
@@ -335,8 +105,6 @@ type Types struct {
 	Float64        float64       `ssm:"float64"`
 	Duration       time.Duration `ssm:"duration"`
 	DurationString time.Duration `ssm:"durationstring"`
-
-	//UintptrStr uintptr
 
 	PBool    *bool    `ssm:"pbool"`
 	PInt     *int     `ssm:"pint"`
@@ -364,14 +132,7 @@ type Types struct {
 
 	Top  Top
 	PTop *Top
-	/*
-		SliceN  []Nested
-		SlicePN []*Nested
-		PSliceN *[]Nested
 
-		Interface  interface{}
-		PInterface *interface{}
-	*/
 	unexported int
 }
 
@@ -402,7 +163,7 @@ func TestNonPtrAndNilInput(t *testing.T) {
 		"non ptr": {in: struct{}{}, want: &InvalidTypeError{Type: reflect.TypeOf(struct{}{})}},
 	}
 
-	m := NewMockSSMClient()
+	m := NewMockClient()
 	for n, tc := range tests {
 		err := Load(m, tc.in)
 		assert.EqualErrorf(t, err, tc.want.Error(), "unexpected error while executing test %s", n)
@@ -411,7 +172,7 @@ func TestNonPtrAndNilInput(t *testing.T) {
 
 func TestTypeConvert(t *testing.T) {
 	ex := NewTypes()
-	err := Load(NewMockSSMClient(), ex)
+	err := Load(NewMockClient(), ex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +195,7 @@ func TestUnmarshalIface(t *testing.T) {
 		}}
 
 	for n, tc := range tests {
-		err := Load(NewMockSSMClient(), tc.in)
+		err := Load(NewMockClient(), tc.in)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -465,7 +226,7 @@ func TestTypeConvertErrors(t *testing.T) {
 	}
 
 	for n, tc := range tests {
-		err := Load(NewMockSSMClient(), tc.in)
+		err := Load(NewMockClient(), tc.in)
 		assert.EqualError(t, err, tc.want.Error(), "test '%s' failed", n)
 	}
 }
@@ -474,7 +235,7 @@ func TestInvalidParams(t *testing.T) {
 	var c struct {
 		Invalid string `ssm:"/no/such/param"`
 	}
-	err := Load(NewMockSSMClient(), &c)
+	err := Load(NewMockClient(), &c)
 	assert.Error(t, err)
 }
 
@@ -485,7 +246,7 @@ func TestMixedPlainAndDecryptParams(t *testing.T) {
 		Decrypt1 int    `ssm:"int,decrypt"`
 		Decrypt2 int32  `ssm:"int32,decrypt"`
 	}
-	err := Load(NewMockSSMClient(), &c)
+	err := Load(NewMockClient(), &c)
 	assert.NoError(t, err)
 	assert.Equal(t, c.Plain1, "this is a string")
 	assert.Equal(t, c.Plain2, true)
@@ -510,7 +271,7 @@ type SimpleJSON struct {
 
 func TestJSON(t *testing.T) {
 	var j JSONTest
-	err := Load(NewMockSSMClient(), &j)
+	err := Load(NewMockClient(), &j)
 	assert.NoError(t, err)
 	s := SimpleJSON{F1: 1, F2: "2"}
 	assert.Equal(t, s, j.JSON)
@@ -525,7 +286,7 @@ func TestJSONError(t *testing.T) {
 	var j struct {
 		SimpleJSON `ssm:"badjson,json"`
 	}
-	err := Load(NewMockSSMClient(), &j)
+	err := Load(NewMockClient(), &j)
 	assert.Error(t, err)
 }
 
@@ -533,7 +294,7 @@ func TestJSONWithUnmarshallerError(t *testing.T) {
 	var j struct {
 		Test str `ssm:"string,json"`
 	}
-	err := Load(NewMockSSMClient(), &j)
+	err := Load(NewMockClient(), &j)
 	assert.Error(t, err)
 }
 
@@ -581,50 +342,33 @@ func TestTagParse(t *testing.T) {
 	}
 }
 
-func TestPartition(t *testing.T) {
-	var tests = []struct {
-		in   []bool
-		lenp int
-		lend int
-	}{
-		{nil, 0, 0},
-		{[]bool{}, 0, 0},
-		{[]bool{false}, 1, 0},
-		{[]bool{true}, 0, 1},
-		{[]bool{false, true}, 1, 1},
-		{[]bool{true, false}, 1, 1},
-		{[]bool{false, false}, 2, 0},
-		{[]bool{true, true}, 0, 2},
-		{[]bool{true, false, true}, 1, 2},
-		{[]bool{false, true, false}, 2, 1},
-		{[]bool{false, false, true}, 2, 1},
-		{[]bool{true, false, false}, 2, 1},
-		{[]bool{false, false, false}, 3, 0},
-		{[]bool{true, true, true}, 0, 3},
+func TestBatchIterate(t *testing.T) {
+	fields := make([]*field, 25)
+	for i := range fields {
+		fields[i] = &field{key: fmt.Sprintf("key%d", i)}
 	}
-	for _, x := range tests {
-		f := makePartitionFields(x.in)
-		plain, decrypt := partitionFields(f, func(x *field) bool {
-			return x.decrypt
-		})
-		assert.Len(t, plain, x.lenp)
-		assert.Len(t, decrypt, x.lend)
-		for i := range plain {
-			assert.Equal(t, false, plain[i].decrypt)
+	var batches int
+	err := batchIterateFields(fields, 10, func(f []*field) error {
+		batches++
+		if batches < 3 {
+			assert.Len(t, f, 10)
+		} else {
+			assert.Len(t, f, 5)
 		}
-		for i := range decrypt {
-			assert.Equal(t, true, decrypt[i].decrypt)
-		}
-	}
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 3, batches)
 }
 
-func makePartitionFields(x []bool) []*field {
-	if x == nil {
-		return nil
+func TestLoadWithParameters(t *testing.T) {
+	m := NewMockClient()
+	m.Data["/dev/environment"] = "development"
+
+	var c struct {
+		Env string `ssm:"/{{.env}}/environment"`
 	}
-	f := make([]*field, len(x))
-	for i := range x {
-		f[i] = &field{decrypt: x[i]}
-	}
-	return f
+	err := LoadWithParameters(m, &c, P{"env": "dev"})
+	assert.NoError(t, err)
+	assert.Equal(t, "development", c.Env)
 }

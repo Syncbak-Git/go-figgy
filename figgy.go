@@ -1,4 +1,4 @@
-//Package figgy provides tags for loading parameters from AWS Parameter Store
+// Package figgy provides tags for loading parameters from AWS Parameter Store or AWS Secrets Manager
 package figgy
 
 import (
@@ -11,17 +11,20 @@ import (
 	"strings"
 	"text/template"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 )
-
-// maxParameters is the maximum number of parameters that can be requested in a single call to GetParameters
-const maxParameters = 10
 
 var durationType reflect.Type = reflect.TypeOf(time.Duration(0))
 
+// Client abstracts over any key-value config backend (SSM, Secrets Manager, etc).
+type Client interface {
+	// GetValues fetches values for the given keys.
+	// Returns a map of key->value. Returns error if any key is missing or unreachable.
+	GetValues(keys []string) (map[string]string, error)
+	// BatchSize returns the max keys per request for this backend.
+	BatchSize() int
+}
+
+// Unmarshaler is the interface implemented by types that can unmarshal a parameter value.
 type Unmarshaler interface {
 	UnmarshalParameter(string) error
 }
@@ -90,26 +93,26 @@ func newField(key string, decrypt bool) *field {
 // P is a convenience alias for passing paramters to LoadWithParameters
 type P map[string]interface{}
 
-// Load AWS Parameter Store parameters based on the defined tags.
+// Load parameters based on the defined tags using the provided Client backend.
 //
 // When a source type is an array, it is assumed the parameter being loaded
 // is a comma separated list.  The list will be split and converted to
 // match the array's typing.
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
-func Load(c ssmiface.SSMAPI, v interface{}) error {
+func Load(c Client, v interface{}) error {
 	return LoadWithParameters(c, v, nil)
 }
 
-// LoadWithParameters loads AWS Parameter Store parameters based on the defined tags, performing parameter
-// substitution on field tags using data-driven templates from "text/template".
+// LoadWithParameters loads parameters based on the defined tags using the provided Client backend,
+// performing parameter substitution on field tags using data-driven templates from "text/template".
 //
 // When a source type is an array, it is assumed the parameter being loaded
 // is a comma separated list.  The list will be split and converted to
 // match the array's typing.
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
-func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) error {
+func LoadWithParameters(c Client, v interface{}, data interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return &InvalidTypeError{Type: reflect.TypeOf(v)}
@@ -121,37 +124,31 @@ func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) erro
 	return load(c, t)
 }
 
-// load fields from AWS Parameter Store
-func load(c ssmiface.SSMAPI, f []*field) error {
-	plain, decrypt := partitionFields(f, func(x *field) bool {
-		return x.decrypt
-	})
-	err := batchIterateFields(plain, maxParameters, func(f []*field) error {
-		return loadParameters(c, f, false)
-	})
-	if err != nil {
-		return err
-	}
-	return batchIterateFields(decrypt, maxParameters, func(f []*field) error {
-		return loadParameters(c, f, true)
-	})
-}
-
-// in place half stable partition
-func partitionFields(f []*field, suffix func(*field) bool) (p1, p2 []*field) {
-	var i int
-	for ; i < len(f); i++ {
-		if suffix(f[i]) {
-			break
+// load fields using the provided Client backend
+func load(c Client, f []*field) error {
+	return batchIterateFields(f, c.BatchSize(), func(batch []*field) error {
+		keys := make([]string, len(batch))
+		for i, x := range batch {
+			keys[i] = x.key
 		}
-	}
-	for j := i + 1; j < len(f); j++ {
-		if !suffix(f[j]) {
-			f[i], f[j] = f[j], f[i]
-			i++
+		vals, err := c.GetValues(keys)
+		if err != nil {
+			return err
 		}
-	}
-	return f[:i], f[i:]
+		for _, x := range batch {
+			v, ok := vals[x.key]
+			if !ok {
+				return fmt.Errorf("failed to load parameter for key '%s'", x.key)
+			}
+			if err := set(x, v); err != nil {
+				if cte, ok := err.(*ConvertTypeError); ok {
+					cte.Field = x.field.Name
+				}
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func batchIterateFields(f []*field, batchSize int, g func([]*field) error) error {
@@ -166,63 +163,6 @@ func batchIterateFields(f []*field, batchSize int, g func([]*field) error) error
 		i = j
 	}
 	return nil
-}
-
-func loadParameters(c ssmiface.SSMAPI, f []*field, decrypt bool) error {
-	params, err := getParameters(c, f, decrypt)
-	if err != nil {
-		return err
-	}
-	idx := indexParameters(params)
-	for _, x := range f {
-		p, ok := idx[x.key]
-		if !ok {
-			return fmt.Errorf("failed to load parameter for key '%s'", x.key)
-		}
-		err = set(x, aws.StringValue(p.Value))
-		if err != nil {
-			switch err := err.(type) {
-			case *ConvertTypeError:
-				//enrich the error with the field
-				err.Field = x.field.Name
-				return err
-			}
-			return err
-		}
-	}
-	return nil
-}
-
-func getParameters(c ssmiface.SSMAPI, f []*field, decrypt bool) ([]*ssm.Parameter, error) {
-	res, err := c.GetParameters(&ssm.GetParametersInput{
-		Names:          parameterNames(f),
-		WithDecryption: aws.Bool(decrypt),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(res.InvalidParameters) != 0 {
-		return nil, fmt.Errorf("invalid parameters: %s",
-			strings.Join(aws.StringValueSlice(res.InvalidParameters), ", "),
-		)
-	}
-	return res.Parameters, nil
-}
-
-func parameterNames(f []*field) []*string {
-	names := make([]*string, len(f))
-	for i := range f {
-		names[i] = aws.String(f[i].key)
-	}
-	return names
-}
-
-func indexParameters(params []*ssm.Parameter) map[string]*ssm.Parameter {
-	idx := make(map[string]*ssm.Parameter, len(params))
-	for _, p := range params {
-		idx[aws.StringValue(p.Name)] = p
-	}
-	return idx
 }
 
 // walk the value recursively to initialize pointers and build a graph of fields and tag options
