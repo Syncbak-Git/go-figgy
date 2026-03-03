@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -176,6 +179,38 @@ func TestTypeConvert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Verify all values were correctly populated
+	assert.Equal(t, true, ex.Bool)
+	assert.Equal(t, 2, ex.Int)
+	assert.Equal(t, int8(3), ex.Int8)
+	assert.Equal(t, int16(4), ex.Int16)
+	assert.Equal(t, int32(5), ex.Int32)
+	assert.Equal(t, int64(6), ex.Int64)
+	assert.Equal(t, uint(7), ex.Uint)
+	assert.Equal(t, uint8(8), ex.Uint8)
+	assert.Equal(t, uint16(9), ex.Uint16)
+	assert.Equal(t, uint32(10), ex.Uint32)
+	assert.Equal(t, uint64(11), ex.Uint64)
+	assert.Equal(t, uintptr(12), ex.Uintptr)
+	assert.Equal(t, float32(12.1), ex.Float32)
+	assert.Equal(t, 12.2, ex.Float64)
+	assert.Equal(t, "this is a string", ex.String)
+	assert.Equal(t, "this is a ptr to a string", *ex.PString)
+	assert.Equal(t, []int{1, 2, 3, 4, 5}, ex.Slice)
+
+	// Duration from nanosecond integer (falls through ParseDuration to int64 parser)
+	assert.Equal(t, time.Hour, ex.Duration)
+	// Duration from string format
+	assert.Equal(t, time.Hour, ex.DurationString)
+
+	// Pointer types
+	assert.NotNil(t, ex.PBool)
+	assert.Equal(t, true, *ex.PBool)
+	assert.NotNil(t, ex.PInt)
+	assert.Equal(t, 13, *ex.PInt)
+	assert.NotNil(t, ex.PFloat64)
+	assert.Equal(t, 23.2, *ex.PFloat64)
 }
 
 func TestUnmarshalIface(t *testing.T) {
@@ -371,4 +406,214 @@ func TestLoadWithParameters(t *testing.T) {
 	err := LoadWithParameters(m, &c, P{"env": "dev"})
 	assert.NoError(t, err)
 	assert.Equal(t, "development", c.Env)
+}
+
+func TestLoadEmptyStruct(t *testing.T) {
+	m := NewMockClient()
+	var c struct {
+		Ignored string
+	}
+	err := Load(m, &c)
+	assert.NoError(t, err)
+}
+
+func TestLoadBatchSizeOne(t *testing.T) {
+	m := &MockClient{
+		batchSize: 1,
+		Data: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		},
+	}
+	var c struct {
+		A string `ssm:"a"`
+		B string `ssm:"b"`
+		C string `ssm:"c"`
+	}
+	err := Load(m, &c)
+	assert.NoError(t, err)
+	assert.Equal(t, "1", c.A)
+	assert.Equal(t, "2", c.B)
+	assert.Equal(t, "3", c.C)
+}
+
+func TestLoadExactBatchSize(t *testing.T) {
+	m := &MockClient{
+		batchSize: 2,
+		Data: map[string]string{
+			"a": "1",
+			"b": "2",
+		},
+	}
+	var c struct {
+		A string `ssm:"a"`
+		B string `ssm:"b"`
+	}
+	err := Load(m, &c)
+	assert.NoError(t, err)
+	assert.Equal(t, "1", c.A)
+	assert.Equal(t, "2", c.B)
+}
+
+func TestLoadGetValuesError(t *testing.T) {
+	m := &MockClient{
+		batchSize: 10,
+		Data:      map[string]string{}, // empty — all keys will fail
+	}
+	var c struct {
+		Missing string `ssm:"nope"`
+	}
+	err := Load(m, &c)
+	assert.Error(t, err)
+}
+
+// partialMockClient returns a map missing some requested keys (without erroring)
+type partialMockClient struct {
+	data map[string]string
+}
+
+func (c *partialMockClient) GetValues(keys []string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, k := range keys {
+		if v, ok := c.data[k]; ok {
+			out[k] = v
+		}
+		// silently omit missing keys — no error
+	}
+	return out, nil
+}
+
+func (c *partialMockClient) BatchSize() int { return 10 }
+
+func TestLoadKeyNotInMap(t *testing.T) {
+	c := &partialMockClient{
+		data: map[string]string{"a": "1"},
+	}
+	var cfg struct {
+		A string `ssm:"a"`
+		B string `ssm:"b"`
+	}
+	err := Load(c, &cfg)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to load parameter for key 'b'")
+}
+
+func TestLoadMalformedTag(t *testing.T) {
+	m := NewMockClient()
+	var c struct {
+		Bad string `ssm:","`
+	}
+	err := Load(m, &c)
+	assert.Error(t, err)
+	assert.IsType(t, &TagParseError{}, err)
+}
+
+func TestLoadNestedMalformedTag(t *testing.T) {
+	m := NewMockClient()
+	type Inner struct {
+		Bad string `ssm:","`
+	}
+	var c struct {
+		Nested Inner
+	}
+	err := Load(m, &c)
+	assert.Error(t, err)
+	assert.IsType(t, &TagParseError{}, err)
+}
+
+func TestConvertTypeError_EmptyFieldAndType(t *testing.T) {
+	e := &ConvertTypeError{Value: "abc"}
+	assert.Equal(t, "failed to convert 'abc'", e.Error())
+}
+
+func TestConvertTypeError_WithFieldAndType(t *testing.T) {
+	e := &ConvertTypeError{Field: "Name", Type: "int", Value: "abc"}
+	assert.Equal(t, "failed to convert 'abc' to int for field Name", e.Error())
+}
+
+func TestInvalidTypeError_Ptr(t *testing.T) {
+	var x *int
+	e := &InvalidTypeError{Type: reflect.TypeOf(x)}
+	assert.Equal(t, "invalid type *int", e.Error())
+}
+
+func TestBatchIterateEmpty(t *testing.T) {
+	var called bool
+	err := batchIterateFields(nil, 10, func(f []*field) error {
+		called = true
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.False(t, called)
+}
+
+func TestBatchIterateError(t *testing.T) {
+	fields := []*field{{key: "a"}}
+	err := batchIterateFields(fields, 10, func(f []*field) error {
+		return fmt.Errorf("batch error")
+	})
+	assert.EqualError(t, err, "batch error")
+}
+
+func TestLoadOnlyUnexportedFields(t *testing.T) {
+	m := NewMockClient()
+	var c struct {
+		hidden string //nolint:unused
+	}
+	err := Load(m, &c)
+	assert.NoError(t, err)
+}
+
+func TestSSMClientIntegration(t *testing.T) {
+	// Test that NewSSMClient produces a working Client that can be passed to Load
+	api := &ssmIntegrationMock{
+		data: map[string]string{
+			"host": "db.example.com",
+			"port": "5432",
+		},
+	}
+	c := NewSSMClient(api, false)
+
+	var cfg struct {
+		Host string `ssm:"host"`
+		Port int    `ssm:"port"`
+	}
+	err := Load(c, &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, "db.example.com", cfg.Host)
+	assert.Equal(t, 5432, cfg.Port)
+}
+
+// ssmIntegrationMock is a minimal ssmiface.SSMAPI for integration testing
+type ssmIntegrationMock struct {
+	ssmiface.SSMAPI
+	data map[string]string
+}
+
+func (m *ssmIntegrationMock) GetParameters(input *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
+	out := &ssm.GetParametersOutput{}
+	for _, name := range input.Names {
+		k := aws.StringValue(name)
+		if v, ok := m.data[k]; ok {
+			out.Parameters = append(out.Parameters, &ssm.Parameter{
+				Name:  name,
+				Value: aws.String(v),
+			})
+		} else {
+			out.InvalidParameters = append(out.InvalidParameters, name)
+		}
+	}
+	return out, nil
+}
+
+func TestTagParseWhitespace(t *testing.T) {
+	f := reflect.TypeOf(struct {
+		Field string `ssm:" key , decrypt , json "`
+	}{}).Field(0)
+	fld, err := tag(f, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, "key", fld.key)
+	assert.True(t, fld.decrypt)
+	assert.True(t, fld.json)
 }
