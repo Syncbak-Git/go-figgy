@@ -617,3 +617,33 @@ func TestTagParseWhitespace(t *testing.T) {
 	assert.True(t, fld.decrypt)
 	assert.True(t, fld.json)
 }
+
+func TestSliceConversionError(t *testing.T) {
+	m := &MockClient{
+		batchSize: 10,
+		Data: map[string]string{
+			"nums": "1,abc,3",
+		},
+	}
+	var c struct {
+		Nums []int `ssm:"nums"`
+	}
+	err := Load(m, &c)
+	assert.Error(t, err)
+	assert.IsType(t, &ConvertTypeError{}, err)
+}
+
+func TestPointerSliceConversionError(t *testing.T) {
+	m := &MockClient{
+		batchSize: 10,
+		Data: map[string]string{
+			"nums": "1,bad,3",
+		},
+	}
+	var c struct {
+		Nums []*int `ssm:"nums"`
+	}
+	err := Load(m, &c)
+	assert.Error(t, err)
+	assert.IsType(t, &ConvertTypeError{}, err)
+}

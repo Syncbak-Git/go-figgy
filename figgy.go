@@ -261,20 +261,21 @@ func set(f *field, s string) error {
 	// handles the case data types are wrapped in other constructs, EG slices
 	case reflect.Ptr:
 		// create new pointer to a zero value
-		new := reflect.New(v.Type().Elem())
-		set(&field{value: new.Elem()}, s)
-		// assign new pointer
-		v.Set(new)
-		break
+		p := reflect.New(v.Type().Elem())
+		if err := set(&field{value: p.Elem()}, s); err != nil {
+			return err
+		}
+		v.Set(p)
 	case reflect.Slice:
 		// we assume the list is separated by commas
 		l := strings.Split(s, ",")
 		sz := len(l)
 		v.Set(reflect.MakeSlice(v.Type(), sz, sz))
 		for i, w := range l {
-			set(&field{value: v.Index(i)}, w)
+			if err := set(&field{value: v.Index(i)}, w); err != nil {
+				return err
+			}
 		}
-		break
 	case reflect.String:
 		v.SetString(s)
 		break
