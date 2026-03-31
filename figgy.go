@@ -3,6 +3,7 @@ package figgy
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,15 +13,21 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
 // maxParameters is the maximum number of parameters that can be requested in a single call to GetParameters
 const maxParameters = 10
 
 var durationType reflect.Type = reflect.TypeOf(time.Duration(0))
+
+// SSMClient is the interface for the subset of AWS SSM operations used by go-figgy.
+// In production, pass a *ssm.Client from aws-sdk-go-v2/service/ssm.
+type SSMClient interface {
+	GetParameters(ctx context.Context, params *ssm.GetParametersInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersOutput, error)
+}
 
 type Unmarshaler interface {
 	UnmarshalParameter(string) error
@@ -97,8 +104,8 @@ type P map[string]interface{}
 // match the array's typing.
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
-func Load(c ssmiface.SSMAPI, v interface{}) error {
-	return LoadWithParameters(c, v, nil)
+func Load(ctx context.Context, c SSMClient, v interface{}) error {
+	return LoadWithParameters(ctx, c, v, nil)
 }
 
 // LoadWithParameters loads AWS Parameter Store parameters based on the defined tags, performing parameter
@@ -109,7 +116,7 @@ func Load(c ssmiface.SSMAPI, v interface{}) error {
 // match the array's typing.
 //
 // You can ignore a field by using "-" for a fields tag.  Unexported fields are also ignored.
-func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) error {
+func LoadWithParameters(ctx context.Context, c SSMClient, v interface{}, data interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return &InvalidTypeError{Type: reflect.TypeOf(v)}
@@ -118,22 +125,22 @@ func LoadWithParameters(c ssmiface.SSMAPI, v interface{}, data interface{}) erro
 	if err != nil {
 		return err
 	}
-	return load(c, t)
+	return load(ctx, c, t)
 }
 
 // load fields from AWS Parameter Store
-func load(c ssmiface.SSMAPI, f []*field) error {
+func load(ctx context.Context, c SSMClient, f []*field) error {
 	plain, decrypt := partitionFields(f, func(x *field) bool {
 		return x.decrypt
 	})
 	err := batchIterateFields(plain, maxParameters, func(f []*field) error {
-		return loadParameters(c, f, false)
+		return loadParameters(ctx, c, f, false)
 	})
 	if err != nil {
 		return err
 	}
 	return batchIterateFields(decrypt, maxParameters, func(f []*field) error {
-		return loadParameters(c, f, true)
+		return loadParameters(ctx, c, f, true)
 	})
 }
 
@@ -168,8 +175,8 @@ func batchIterateFields(f []*field, batchSize int, g func([]*field) error) error
 	return nil
 }
 
-func loadParameters(c ssmiface.SSMAPI, f []*field, decrypt bool) error {
-	params, err := getParameters(c, f, decrypt)
+func loadParameters(ctx context.Context, c SSMClient, f []*field, decrypt bool) error {
+	params, err := getParameters(ctx, c, f, decrypt)
 	if err != nil {
 		return err
 	}
@@ -179,7 +186,7 @@ func loadParameters(c ssmiface.SSMAPI, f []*field, decrypt bool) error {
 		if !ok {
 			return fmt.Errorf("failed to load parameter for key '%s'", x.key)
 		}
-		err = set(x, aws.StringValue(p.Value))
+		err = set(x, aws.ToString(p.Value))
 		if err != nil {
 			switch err := err.(type) {
 			case *ConvertTypeError:
@@ -193,8 +200,8 @@ func loadParameters(c ssmiface.SSMAPI, f []*field, decrypt bool) error {
 	return nil
 }
 
-func getParameters(c ssmiface.SSMAPI, f []*field, decrypt bool) ([]*ssm.Parameter, error) {
-	res, err := c.GetParameters(&ssm.GetParametersInput{
+func getParameters(ctx context.Context, c SSMClient, f []*field, decrypt bool) ([]types.Parameter, error) {
+	res, err := c.GetParameters(ctx, &ssm.GetParametersInput{
 		Names:          parameterNames(f),
 		WithDecryption: aws.Bool(decrypt),
 	})
@@ -203,24 +210,24 @@ func getParameters(c ssmiface.SSMAPI, f []*field, decrypt bool) ([]*ssm.Paramete
 	}
 	if len(res.InvalidParameters) != 0 {
 		return nil, fmt.Errorf("invalid parameters: %s",
-			strings.Join(aws.StringValueSlice(res.InvalidParameters), ", "),
+			strings.Join(res.InvalidParameters, ", "),
 		)
 	}
 	return res.Parameters, nil
 }
 
-func parameterNames(f []*field) []*string {
-	names := make([]*string, len(f))
+func parameterNames(f []*field) []string {
+	names := make([]string, len(f))
 	for i := range f {
-		names[i] = aws.String(f[i].key)
+		names[i] = f[i].key
 	}
 	return names
 }
 
-func indexParameters(params []*ssm.Parameter) map[string]*ssm.Parameter {
-	idx := make(map[string]*ssm.Parameter, len(params))
+func indexParameters(params []types.Parameter) map[string]types.Parameter {
+	idx := make(map[string]types.Parameter, len(params))
 	for _, p := range params {
-		idx[aws.StringValue(p.Name)] = p
+		idx[aws.ToString(p.Name)] = p
 	}
 	return idx
 }
