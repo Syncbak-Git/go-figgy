@@ -1,6 +1,7 @@
 package figgy
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -8,32 +9,26 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
 type MockSSMClient struct {
-	ssmiface.SSMAPI
-	Data map[string]*ssm.GetParameterOutput
+	Data map[string]types.Parameter
 }
 
-func (c MockSSMClient) GetParameter(i *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
-	//TODO: Lookup key and mimic more closely how the aws sdk works, no key causes a panic
-	return c.Data[*i.Name], nil
-}
-
-func (c MockSSMClient) GetParameters(i *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
+func (c MockSSMClient) GetParameters(ctx context.Context, i *ssm.GetParametersInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersOutput, error) {
 	var out = new(ssm.GetParametersOutput)
 	if len(i.Names) > maxParameters {
 		return nil, fmt.Errorf("max parameters exceeded: received %d, max %d", len(i.Names), maxParameters)
 	}
 	for _, n := range i.Names {
-		p, ok := c.Data[aws.StringValue(n)]
+		p, ok := c.Data[n]
 		if !ok {
 			out.InvalidParameters = append(out.InvalidParameters, n)
 		} else {
-			out.Parameters = append(out.Parameters, p.Parameter)
+			out.Parameters = append(out.Parameters, p)
 		}
 	}
 	return out, nil
@@ -41,272 +36,196 @@ func (c MockSSMClient) GetParameters(i *ssm.GetParametersInput) (*ssm.GetParamet
 
 func NewMockSSMClient() *MockSSMClient {
 	m := &MockSSMClient{}
-	m.Data = map[string]*ssm.GetParameterOutput{
+	m.Data = map[string]types.Parameter{
 		"bool": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("bool"),
-				Type:  aws.String("string"),
-				Value: aws.String("true"),
-			},
+			Name:  aws.String("bool"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("true"),
 		},
 		"int": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int"),
-				Type:  aws.String("string"),
-				Value: aws.String("2"),
-			},
+			Name:  aws.String("int"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("2"),
 		},
 		"int8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int8"),
-				Type:  aws.String("string"),
-				Value: aws.String("3"),
-			},
+			Name:  aws.String("int8"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("3"),
 		},
 		"int16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int16"),
-				Type:  aws.String("string"),
-				Value: aws.String("4"),
-			},
+			Name:  aws.String("int16"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("4"),
 		},
 		"int32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int32"),
-				Type:  aws.String("string"),
-				Value: aws.String("5"),
-			},
+			Name:  aws.String("int32"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("5"),
 		},
 		"int64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("int64"),
-				Type:  aws.String("string"),
-				Value: aws.String("6"),
-			},
+			Name:  aws.String("int64"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("6"),
 		},
 		"uint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint"),
-				Type:  aws.String("string"),
-				Value: aws.String("7"),
-			},
+			Name:  aws.String("uint"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("7"),
 		},
 		"uint8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint8"),
-				Type:  aws.String("string"),
-				Value: aws.String("8"),
-			},
+			Name:  aws.String("uint8"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("8"),
 		},
 		"uint16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint16"),
-				Type:  aws.String("string"),
-				Value: aws.String("9"),
-			},
+			Name:  aws.String("uint16"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("9"),
 		},
 		"uint32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint32"),
-				Type:  aws.String("string"),
-				Value: aws.String("10"),
-			},
+			Name:  aws.String("uint32"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("10"),
 		},
 		"uint64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uint64"),
-				Type:  aws.String("string"),
-				Value: aws.String("11"),
-			},
+			Name:  aws.String("uint64"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("11"),
 		},
 		"uintptr": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("uintptr"),
-				Type:  aws.String("string"),
-				Value: aws.String("12"),
-			},
+			Name:  aws.String("uintptr"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("12"),
 		},
 		"float32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("float32"),
-				Type:  aws.String("string"),
-				Value: aws.String("12.1"),
-			},
+			Name:  aws.String("float32"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("12.1"),
 		},
 		"float64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("float64"),
-				Type:  aws.String("string"),
-				Value: aws.String("12.2"),
-			},
+			Name:  aws.String("float64"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("12.2"),
 		},
 		"duration": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("duration"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600000000000"),
-			},
+			Name:  aws.String("duration"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("3600000000000"),
 		},
 		"durationstring": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("durationstring"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600s"),
-			},
+			Name:  aws.String("durationstring"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("3600s"),
 		},
 		"pbool": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pbool"),
-				Type:  aws.String("string"),
-				Value: aws.String("true"),
-			},
+			Name:  aws.String("pbool"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("true"),
 		},
 		"pint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint"),
-				Type:  aws.String("string"),
-				Value: aws.String("13"),
-			},
+			Name:  aws.String("pint"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("13"),
 		},
 		"pint8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint8"),
-				Type:  aws.String("string"),
-				Value: aws.String("14"),
-			},
+			Name:  aws.String("pint8"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("14"),
 		},
 		"pint16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint16"),
-				Type:  aws.String("string"),
-				Value: aws.String("15"),
-			},
+			Name:  aws.String("pint16"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("15"),
 		},
 		"pint32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint32"),
-				Type:  aws.String("string"),
-				Value: aws.String("16"),
-			},
+			Name:  aws.String("pint32"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("16"),
 		},
 		"pint64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pint64"),
-				Type:  aws.String("string"),
-				Value: aws.String("17"),
-			},
+			Name:  aws.String("pint64"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("17"),
 		},
 		"puint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint"),
-				Type:  aws.String("string"),
-				Value: aws.String("18"),
-			},
+			Name:  aws.String("puint"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("18"),
 		},
 		"puint8": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint8"),
-				Type:  aws.String("string"),
-				Value: aws.String("19"),
-			},
+			Name:  aws.String("puint8"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("19"),
 		},
 		"puint16": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint16"),
-				Type:  aws.String("string"),
-				Value: aws.String("20"),
-			},
+			Name:  aws.String("puint16"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("20"),
 		},
 		"puint32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint32"),
-				Type:  aws.String("string"),
-				Value: aws.String("21"),
-			},
+			Name:  aws.String("puint32"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("21"),
 		},
 		"puint64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puint64"),
-				Type:  aws.String("string"),
-				Value: aws.String("22"),
-			},
+			Name:  aws.String("puint64"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("22"),
 		},
 		"puintptr": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("puintptr"),
-				Type:  aws.String("string"),
-				Value: aws.String("23"),
-			},
+			Name:  aws.String("puintptr"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("23"),
 		},
 		"pfloat32": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pfloat32"),
-				Type:  aws.String("string"),
-				Value: aws.String("23.1"),
-			},
+			Name:  aws.String("pfloat32"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("23.1"),
 		},
 		"pfloat64": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pfloat64"),
-				Type:  aws.String("string"),
-				Value: aws.String("23.2"),
-			},
+			Name:  aws.String("pfloat64"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("23.2"),
 		},
 		"string": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("string"),
-				Type:  aws.String("string"),
-				Value: aws.String("this is a string"),
-			},
+			Name:  aws.String("string"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("this is a string"),
 		},
 		"pstring": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pstring"),
-				Type:  aws.String("string"),
-				Value: aws.String("this is a ptr to a string"),
-			},
+			Name:  aws.String("pstring"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("this is a ptr to a string"),
 		},
 		"sliceint": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("sliceint"),
-				Type:  aws.String("string"),
-				Value: aws.String("1,2,3,4,5"),
-			},
+			Name:  aws.String("sliceint"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("1,2,3,4,5"),
 		},
 		"pduration": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pduration"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600000000000"),
-			},
+			Name:  aws.String("pduration"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("3600000000000"),
 		},
-		"pdurationString": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("pdurationstring"),
-				Type:  aws.String("string"),
-				Value: aws.String("3600s"),
-			},
+		"pdurationstring": {
+			Name:  aws.String("pdurationstring"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("3600s"),
 		},
 		"simplejson": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("simplejson"),
-				Type:  aws.String("string"),
-				Value: aws.String(`{"F1": 1, "F2": "2"}`),
-			},
+			Name:  aws.String("simplejson"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String(`{"F1": 1, "F2": "2"}`),
 		},
 		"simplejsonarray": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("simplejsonarray"),
-				Type:  aws.String("string"),
-				Value: aws.String(`[{"F1": 1, "F2": "2"}]`),
-			},
+			Name:  aws.String("simplejsonarray"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String(`[{"F1": 1, "F2": "2"}]`),
 		},
 		"badjson": {
-			Parameter: &ssm.Parameter{
-				Name:  aws.String("badjson"),
-				Type:  aws.String("string"),
-				Value: aws.String("invalid"),
-			},
+			Name:  aws.String("badjson"),
+			Type:  types.ParameterTypeString,
+			Value: aws.String("invalid"),
 		},
 	}
 	return m
@@ -404,14 +323,14 @@ func TestNonPtrAndNilInput(t *testing.T) {
 
 	m := NewMockSSMClient()
 	for n, tc := range tests {
-		err := Load(m, tc.in)
+		err := Load(context.Background(), m, tc.in)
 		assert.EqualErrorf(t, err, tc.want.Error(), "unexpected error while executing test %s", n)
 	}
 }
 
 func TestTypeConvert(t *testing.T) {
 	ex := NewTypes()
-	err := Load(NewMockSSMClient(), ex)
+	err := Load(context.Background(), NewMockSSMClient(), ex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +353,7 @@ func TestUnmarshalIface(t *testing.T) {
 		}}
 
 	for n, tc := range tests {
-		err := Load(NewMockSSMClient(), tc.in)
+		err := Load(context.Background(), NewMockSSMClient(), tc.in)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -465,7 +384,7 @@ func TestTypeConvertErrors(t *testing.T) {
 	}
 
 	for n, tc := range tests {
-		err := Load(NewMockSSMClient(), tc.in)
+		err := Load(context.Background(), NewMockSSMClient(), tc.in)
 		assert.EqualError(t, err, tc.want.Error(), "test '%s' failed", n)
 	}
 }
@@ -474,7 +393,7 @@ func TestInvalidParams(t *testing.T) {
 	var c struct {
 		Invalid string `ssm:"/no/such/param"`
 	}
-	err := Load(NewMockSSMClient(), &c)
+	err := Load(context.Background(), NewMockSSMClient(), &c)
 	assert.Error(t, err)
 }
 
@@ -485,7 +404,7 @@ func TestMixedPlainAndDecryptParams(t *testing.T) {
 		Decrypt1 int    `ssm:"int,decrypt"`
 		Decrypt2 int32  `ssm:"int32,decrypt"`
 	}
-	err := Load(NewMockSSMClient(), &c)
+	err := Load(context.Background(), NewMockSSMClient(), &c)
 	assert.NoError(t, err)
 	assert.Equal(t, c.Plain1, "this is a string")
 	assert.Equal(t, c.Plain2, true)
@@ -510,7 +429,7 @@ type SimpleJSON struct {
 
 func TestJSON(t *testing.T) {
 	var j JSONTest
-	err := Load(NewMockSSMClient(), &j)
+	err := Load(context.Background(), NewMockSSMClient(), &j)
 	assert.NoError(t, err)
 	s := SimpleJSON{F1: 1, F2: "2"}
 	assert.Equal(t, s, j.JSON)
@@ -525,7 +444,7 @@ func TestJSONError(t *testing.T) {
 	var j struct {
 		SimpleJSON `ssm:"badjson,json"`
 	}
-	err := Load(NewMockSSMClient(), &j)
+	err := Load(context.Background(), NewMockSSMClient(), &j)
 	assert.Error(t, err)
 }
 
@@ -533,7 +452,7 @@ func TestJSONWithUnmarshallerError(t *testing.T) {
 	var j struct {
 		Test str `ssm:"string,json"`
 	}
-	err := Load(NewMockSSMClient(), &j)
+	err := Load(context.Background(), NewMockSSMClient(), &j)
 	assert.Error(t, err)
 }
 
