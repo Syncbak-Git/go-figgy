@@ -14,7 +14,7 @@ TLDR: Tags are awesome and injecting configuration from AWS into our structs wit
 
 ## Install
 
-`go get github.com/Syncbak-Git/go-figgy`
+`go get github.com/Syncbak-Git/go-figgy/v2`
 
 ## Getting started
 

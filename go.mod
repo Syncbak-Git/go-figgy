@@ -1,4 +1,4 @@
-module github.com/Syncbak-Git/go-figgy
+module github.com/Syncbak-Git/go-figgy/v2
 
 go 1.24
 
