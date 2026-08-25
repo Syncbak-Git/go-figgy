@@ -14,7 +14,7 @@ TLDR: Tags are awesome and injecting configuration from AWS into our structs wit
 
 ## Install
 
-`go get github.com/Syncbak-Git/go-figgy`
+`go get github.com/Syncbak-Git/go-figgy/v2`
 
 ## Getting started
 
@@ -29,7 +29,7 @@ type Config struct{
 
 //... meanwhile, more handwaving
 cfg := Config{}
-figgy.Load(ssmClient, &cfg)
+figgy.Load(ctx, ssmClient, &cfg)
 ```
 
 ## Runtime parameters
@@ -44,7 +44,7 @@ type Config struct{
 }
 
 cfg := Config{}
-figgy.LoadWithParameters(ssmClient, &cfg, figgy.P{"env": "prod"})
+figgy.LoadWithParameters(ctx, ssmClient, &cfg, figgy.P{"env": "prod"})
 ```
 
 Using `Server` as an example, this will be computed to a key of `/myapp/prod/server` at runtime.
